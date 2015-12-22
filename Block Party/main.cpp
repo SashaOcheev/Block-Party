@@ -18,102 +18,94 @@ const struct
 	float DISTANCE = 10.f;
 } BLOCK;
 
-struct
-{
-	sf::Vector2f FIRST = {0.f, 0.5f};
-} SPEED;
 
+const int ANIMATION_COUNT = 3;
 const int BLOCK_COUNT = 6;
-const float FIRST_MAX_DEVIATION = 100.f;
-
-struct
-{
-	float START = 5.f;
-	float FIRST = FIRST_MAX_DEVIATION / SPEED.FIRST.y * 10;
-} STEP_TIME;
+const float TIME_DIVIDER = 800.f;
 
 
 //        left block        ////////////////////////////////////////
-struct Left
+struct Rectangle_params
 {
-	sf::Vector2f start;
-	sf::Vector2f speed;
+	sf::Color color;
+	sf::Vector2f size;
 	sf::Vector2f position;
-	float angle;
-	bool is_not_set[BLOCK_COUNT];
+	sf::Vector2f origin;
+	float rotation;
+};
+
+void setRectangle(sf::RectangleShape &rectangle, Rectangle_params params)
+{
+	rectangle.setFillColor(params.color);
+	rectangle.setSize(params.size);
+	rectangle.setPosition(params.position);
+	rectangle.setOrigin(params.origin);
+	rectangle.setRotation(params.rotation);
+}
+
+struct Block
+{
+	Rectangle_params params;
 	sf::RectangleShape block;
 
-	Left()
-	{
-
-	}
-
-	void nullStat()
-	{
-		for (int i = 0; i < BLOCK_COUNT; i++)
-			is_not_set[i] = true;
-	}
-
-	void setStart()
-	{
-		start = { WINDOW.SIZE.x / 2.f - BLOCK.DISTANCE * 2.5f - BLOCK.SIZE * 3, WINDOW.SIZE.y / 2.f - BLOCK.SIZE * 0.5f };
-		block.setFillColor(sf::Color::Blue);
-		block.setSize(sf::Vector2f(BLOCK.SIZE, BLOCK.SIZE));
-		is_not_set[0] = false;
-	}
+	Block() {}
 	
-	void setFirst()
+	void setStart(sf::Vector2f position)
 	{
-		speed = SPEED.FIRST;
-		position = start;
-		block.setPosition(start);
-		is_not_set[1] = false;
+		params.color = sf::Color::Blue;
+		params.size = {BLOCK.SIZE, BLOCK.SIZE};
+		params.position = position;
+		params.origin = { 0.f, 0.f };
+		params.rotation = 0.f;
+		setRectangle(block, params);
 	}
 };
 ////////////////////////////////////////////////////////////////////
-void start (Left &left, sf::RenderWindow &window)
-{
-	if (left.is_not_set[0])
-		left.setStart();
 
-	sf::Vector2f other_positions = left.start;
-	for (int i = 1; i <= 6; i++)
-	{
-		left.block.setPosition(other_positions);
-		window.draw(left.block);
-		other_positions.x += BLOCK.DISTANCE + BLOCK.SIZE;
-	}
+void resetBoolList(bool is_not_set[ANIMATION_COUNT])
+{
+	for (int i = 0; i < ANIMATION_COUNT; i++)
+		is_not_set[i] = true;
 }
 
-void first(Left &left, sf::RenderWindow &window)
+void setStart(std::vector<Block> &blocks)
 {
-	if (left.is_not_set[1])
-		left.setFirst();
-	if (abs(left.position.y - left.start.y) >= FIRST_MAX_DEVIATION)
-		left.speed.y = -left.speed.y;
-	left.position += left.speed;
+	sf::Vector2f start = { (WINDOW.SIZE.x - BLOCK.DISTANCE * (BLOCK_COUNT - 1) - BLOCK.SIZE * BLOCK_COUNT) / 2.f,
+		(WINDOW.SIZE.y - BLOCK.SIZE) / 2.f };
 	for (int i = 0; i < BLOCK_COUNT; i++)
 	{
-		left.position.x = left.start.x + i * (BLOCK.SIZE + BLOCK.DISTANCE);
-		if (i % 2 == 0)
-			left.block.setPosition(left.position);
-		else
-		{
-			float temp_position_y = left.start.y - left.position.y + left.start.y;
-			left.block.setPosition(left.position.x, temp_position_y);
-		}
-		window.draw(left.block);
+		sf::Vector2f temp_start = start;
+		Block block;
+		temp_start.x = start.x + i * (BLOCK.SIZE + BLOCK.DISTANCE);
+		block.setStart(temp_start);
+		blocks.push_back(block);
 	}
 }
 
+void drawBlocks(sf::RenderWindow &window, std::vector<Block> &blocks)
+{
+	for (int i = 0; i < blocks.size(); i++)
+		window.draw(blocks[i].block);
+}
+
+void setAnimation(bool &is_not_set, std::vector<Block> &blocks,
+				 void (*func)(std::vector<Block> &blocks))
+{
+	if (is_not_set)
+	{
+		(*func)(blocks);
+		is_not_set = false;
+	}
+}
 
 int main()
 {	
-	Left left;
-	left.nullStat();
+	std::vector<Block> blocks;
+	bool is_not_set[ANIMATION_COUNT];
+	resetBoolList(is_not_set);
+
 	sf::Clock clock;
-	float time;
-	float one_step_time;
+	float time = 0.f;
 
 	sf::ContextSettings settings;
 	settings.antialiasingLevel = WINDOW.ANTIALIASING_LEVEL;
@@ -129,15 +121,17 @@ int main()
 		window.clear(sf::Color::White);
 		time = clock.getElapsedTime().asSeconds();
 		
-		if (time <= STEP_TIME.START)
-			start(left, window);
-		else if (time <= STEP_TIME.FIRST)
-			first(left, window);
+		if (time <= 5.f)
+		{
+			setAnimation(is_not_set[0], blocks, setStart);
+			drawBlocks(window, blocks);
+		}
 		else
 		{
-			left.nullStat();
 			clock.restart();
+			resetBoolList(is_not_set);
 		}
+		
 		std::cout << time << std::endl;
 		window.display();
 	}
