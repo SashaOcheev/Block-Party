@@ -22,15 +22,18 @@ const struct
 const struct
 {
 	float SPEED = 0.2f;
-	float MAX_DEVIATION = 100.f;
+	float MAX_DEVIATION = 80.f;
 	float ANGLE_SPEED = 0.1f;
 	float MAX_ANGLE = 90.f;
+	float FOUR_MAX_TIME = 1.f;
+	float DIVIDER = 1000.f;
+	float FIRST_MAX_TIME = 2.f;
 } PARAMS;
 
 
 const int ANIMATION_COUNT = 5;
 const int BLOCK_COUNT = 6;
-const float TIME_DIVIDER = 800.f;
+const int COLOR_COUNT = 7;
 
 
 //        left block        ////////////////////////////////////////
@@ -177,28 +180,60 @@ void setThird(std::vector<Block> &blocks)
 {
 	for (int i = 0; i < blocks.size(); i++)
 	{
-		blocks[i].angle_speed = PARAMS.ANGLE_SPEED;
 		float dist = (i * 2 % 3) * (BLOCK.DISTANCE + BLOCK.SIZE);
 		if (i % 2)
 			dist = ((i + 1) % (blocks.size() / 2)) * (BLOCK.DISTANCE + BLOCK.SIZE);;
-		float temp = sqrt(2 * dist * dist) / PARAMS.MAX_ANGLE * PARAMS.ANGLE_SPEED;
+		float temp = sqrt(2 * dist * dist) / PARAMS.DIVIDER;
 		blocks[i].speed = { -temp, temp };
 		if (i % 2)
-		{
-			blocks[i].block.setOrigin(BLOCK.SIZE, BLOCK.SIZE);
 			blocks[i].speed = { temp, -temp };
-		}
 	}
 }
 void updateThird(std::vector<Block> &blocks, int &repeats)
 {
 	for (int i = 0; i < blocks.size(); i++)
-	{
 		blocks[i].updatePosition();
-		blocks[i].updateRotation();
-	}
-	if (blocks[0].params.rotation >= PARAMS.MAX_ANGLE)
+	if (blocks[2].params.position.x <= blocks[0].start.x)
 		repeats--;
+}
+
+void updateFourth1(std::vector<Block> &blocks, int &repeats)
+{
+	sf::Color colors[COLOR_COUNT]{ sf::Color::Black, sf::Color::Blue, sf::Color::Cyan,
+	sf::Color::Green, sf::Color::Magenta, sf::Color::Red, sf::Color::Yellow };
+	for (int i = 0; i < blocks.size(); i++)
+		blocks[i].block.setFillColor(colors[rand() % COLOR_COUNT]);
+	repeats--;
+}
+void updateFourth2(std::vector<Block> &blocks, int &repeats)
+{
+	for (int i = 0; i < blocks.size(); i++)
+		if (blocks[i].params.rotation <= 360.f)
+		{
+			blocks[i].angle_speed = PARAMS.ANGLE_SPEED;
+			blocks[i].updateRotation();
+		}
+}
+
+bool isAround(sf::Vector2f one, sf::Vector2f two)
+{
+	float deviation = 1.f;
+	return (one.x <= two.x + deviation && one.x >= two.x - deviation &&
+		one.y <= two.y + deviation && one.y >= two.y - deviation);
+}
+void setFifth(std::vector<Block> &blocks)
+{
+	for (int i = 0; i < blocks.size(); i++)
+		blocks[i].speed = { (-blocks[i].params.position.x + blocks[i].start.x) / PARAMS.DIVIDER,
+			( -blocks[i].params.position.y + blocks[i].start.y) / PARAMS.DIVIDER };
+}
+void updateFifth(std::vector<Block> &blocks, int &repeats)
+{
+	for (int i = 0; i < blocks.size(); i++)
+		if (!isAround(blocks[i].params.position, blocks[i].start))
+			blocks[i].updatePosition();
+		else if (i == 4)
+			repeats--;
 }
 
 
@@ -212,10 +247,12 @@ int main()
 	}
 	bool is_not_set[ANIMATION_COUNT];
 	resetBoolList(is_not_set);
-	int repeats[ANIMATION_COUNT] = { 6, 3, 1, 5, 1 };
+	int repeats[ANIMATION_COUNT] = { 4, 3, 1, 5, 1 };
 
 	sf::Clock clock;
 	float time = 0.f;
+	float one_step_time = 0.f;
+	float timer = 0.f;
 
 	sf::ContextSettings settings;
 	settings.antialiasingLevel = WINDOW.ANTIALIASING_LEVEL;
@@ -228,10 +265,10 @@ int main()
 			if (event.type == sf::Event::Closed)
 				window.close();
 
-		window.clear(sf::Color::White);
+		one_step_time = clock.getElapsedTime().asSeconds() - time;
 		time = clock.getElapsedTime().asSeconds();
 		
-		if (time <= 3.f)
+		if (time <= FIRST_MAX_TIME)
 			setAnimation(is_not_set[0], blocks, start);
 		else if (repeats[0] > 0)
 		{
@@ -245,17 +282,33 @@ int main()
 			setAnimation(is_not_set[2], blocks, setThird);
 			updateThird(blocks, repeats[2]);
 		}
+		else if (repeats[3] > 0)
+		{
+			timer += one_step_time;
+			if (timer >= PARAMS.FOUR_MAX_TIME)
+			{
+				updateFourth1(blocks, repeats[3]);
+				timer = 0;
+			}
+			updateFourth2(blocks, repeats[3]);
+		}
+		else if (repeats[4] > 0)
+		{
+			setAnimation(is_not_set[4], blocks, setFifth);
+			updateFifth(blocks, repeats[4]);
+		}
 		else
 		{
 			clock.restart();
 			resetBoolList(is_not_set);
-			repeats[0] = 6;
+			repeats[0] = 4;
 			repeats[1] = 3;
 			repeats[2] = 1;
 			repeats[3] = 5;
 			repeats[4] = 1;
 		}
 		
+		window.clear(sf::Color::White);
 		drawBlocks(window, blocks);
 		window.display();
 	}
