@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string>
 #include <vector>
+#include <cmath>   
 
 const struct
 {
@@ -22,10 +23,12 @@ const struct
 {
 	float SPEED = 0.2f;
 	float MAX_DEVIATION = 100.f;
-} FIRST;
+	float ANGLE_SPEED = 0.1f;
+	float MAX_ANGLE = 90.f;
+} PARAMS;
 
 
-const int ANIMATION_COUNT = 3;
+const int ANIMATION_COUNT = 5;
 const int BLOCK_COUNT = 6;
 const float TIME_DIVIDER = 800.f;
 
@@ -55,6 +58,7 @@ struct Block
 	Rectangle_params params;
 	sf::RectangleShape block;
 	sf::Vector2f speed;
+	float angle_speed;
 
 	Block() {}
 	
@@ -66,6 +70,18 @@ struct Block
 		params.origin = { 0.f, 0.f };
 		params.rotation = 0.f;
 		setRectangle(block, params);
+	}
+
+	void updatePosition()
+	{
+		params.position += speed;
+		block.setPosition(params.position);
+	}
+
+	void updateRotation()
+	{
+		params.rotation += angle_speed;
+		block.setRotation(params.rotation);
 	}
 };
 ////////////////////////////////////////////////////////////////////
@@ -109,59 +125,81 @@ void setFirst(std::vector<Block> &blocks)
 {
 	for (int i = 0; i < blocks.size(); i++)
 		if (i % 2 == 0)
-			blocks[i].speed = { 0.f, FIRST.SPEED };
+			blocks[i].speed = { 0.f, PARAMS.SPEED };
 		else
-			blocks[i].speed = { 0.f, -FIRST.SPEED };
+			blocks[i].speed = { 0.f, -PARAMS.SPEED };
 }
 void updateFirst(std::vector<Block> &blocks, int &repeats)
 {
 	for (int i = 0; i < BLOCK_COUNT; i++)
 	{
-		if (abs(blocks[i].params.position.y - blocks[i].start.y) >= FIRST.MAX_DEVIATION)
+		if (abs(blocks[i].params.position.y - blocks[i].start.y) >= PARAMS.MAX_DEVIATION)
 		{
 			blocks[i].speed.y = -blocks[i].speed.y;
 			if (i == blocks.size() - 1)
 				repeats -= 1;
 		}
-		blocks[i].params.position += blocks[i].speed;
-		blocks[i].block.setPosition(blocks[i].params.position);
+		blocks[i].updatePosition();
 	}
 }
-
 
 void goRectangle(sf::Vector2f left_up, sf::Vector2f size, sf::Vector2f position, sf::Vector2f &move)
 {
 	if (position.x <= left_up.x && position.y <= left_up.y)
-		move = { FIRST.SPEED, 0.f };
+		move = { PARAMS.SPEED, 0.f };
 	else if (position.x >= left_up.x + size.x && position.y <= left_up.y)
-		move = { 0.f, FIRST.SPEED };
+		move = { 0.f, PARAMS.SPEED };
 	else if (position.x >= left_up.x + size.x && position.y >= left_up.y + size.y)
-		move = { -FIRST.SPEED, 0.f };
+		move = { -PARAMS.SPEED, 0.f };
 	else if (position.x <= left_up.x && position.y >= left_up.y + size.y)
-		move = { 0.f, -FIRST.SPEED };
+		move = { 0.f, -PARAMS.SPEED };
 }
 void updateSecond(std::vector<Block> &blocks, int &repeats)
 {
 	for (int i = 0; i < blocks.size(); i++)
 	{
 		if (i % 2 == 0)
-			goRectangle(sf::Vector2f(blocks[i].start.x, blocks[i].start.y - FIRST.MAX_DEVIATION),
-				sf::Vector2f(BLOCK.SIZE + BLOCK.DISTANCE, 2 * FIRST.MAX_DEVIATION), blocks[i].params.position,
+			goRectangle(sf::Vector2f(blocks[i].start.x, blocks[i].start.y - PARAMS.MAX_DEVIATION),
+				sf::Vector2f(BLOCK.SIZE + BLOCK.DISTANCE, 2 * PARAMS.MAX_DEVIATION), blocks[i].params.position,
 				blocks[i].speed);
 		else
-			goRectangle(sf::Vector2f(blocks[i - 1].start.x, blocks[i].start.y - FIRST.MAX_DEVIATION),
-				sf::Vector2f(BLOCK.SIZE + BLOCK.DISTANCE, 2 * FIRST.MAX_DEVIATION), blocks[i].params.position,
+			goRectangle(sf::Vector2f(blocks[i - 1].start.x, blocks[i].start.y - PARAMS.MAX_DEVIATION),
+				sf::Vector2f(BLOCK.SIZE + BLOCK.DISTANCE, 2 * PARAMS.MAX_DEVIATION), blocks[i].params.position,
 				blocks[i].speed);
-		blocks[i].params.position += blocks[i].speed;
-		blocks[i].block.setPosition(blocks[i].params.position);
-		if (i == blocks.size() - 1 && blocks[i].params.position.x >= blocks[i].start.x &&
-			blocks[i].params.position.y >= blocks[i].start.y + FIRST.MAX_DEVIATION)
-			repeats -= 1;
-
+		blocks[i].updatePosition();
 	}
+	if (blocks[0].params.position.x <= blocks[0].start.x &&
+		blocks[0].params.position.y <= blocks[0].start.y - PARAMS.MAX_DEVIATION)
+		repeats -= 1;
 }
 
-
+void setThird(std::vector<Block> &blocks)
+{
+	for (int i = 0; i < blocks.size(); i++)
+	{
+		blocks[i].angle_speed = PARAMS.ANGLE_SPEED;
+		float dist = (i * 2 % 3) * (BLOCK.DISTANCE + BLOCK.SIZE);
+		if (i % 2)
+			dist = ((i + 1) % (blocks.size() / 2)) * (BLOCK.DISTANCE + BLOCK.SIZE);;
+		float temp = sqrt(2 * dist * dist) / PARAMS.MAX_ANGLE * PARAMS.ANGLE_SPEED;
+		blocks[i].speed = { -temp, temp };
+		if (i % 2)
+		{
+			blocks[i].block.setOrigin(BLOCK.SIZE, BLOCK.SIZE);
+			blocks[i].speed = { temp, -temp };
+		}
+	}
+}
+void updateThird(std::vector<Block> &blocks, int &repeats)
+{
+	for (int i = 0; i < blocks.size(); i++)
+	{
+		blocks[i].updatePosition();
+		blocks[i].updateRotation();
+	}
+	if (blocks[0].params.rotation >= PARAMS.MAX_ANGLE)
+		repeats--;
+}
 
 
 int main()
@@ -174,7 +212,7 @@ int main()
 	}
 	bool is_not_set[ANIMATION_COUNT];
 	resetBoolList(is_not_set);
-	int repeats[ANIMATION_COUNT] = { 6, 3, 6 };
+	int repeats[ANIMATION_COUNT] = { 6, 3, 1, 5, 1 };
 
 	sf::Clock clock;
 	float time = 0.f;
@@ -194,20 +232,18 @@ int main()
 		time = clock.getElapsedTime().asSeconds();
 		
 		if (time <= 3.f)
-		{
 			setAnimation(is_not_set[0], blocks, start);
-			drawBlocks(window, blocks);
-		}
 		else if (repeats[0] > 0)
 		{
 			setAnimation(is_not_set[1], blocks, setFirst);
 			updateFirst(blocks, repeats[0]);
-			drawBlocks(window, blocks);
 		}
 		else if (repeats[1] > 0)
-		{
 			updateSecond(blocks, repeats[1]);
-			drawBlocks(window, blocks);
+		else if (repeats[2] > 0)
+		{
+			setAnimation(is_not_set[2], blocks, setThird);
+			updateThird(blocks, repeats[2]);
 		}
 		else
 		{
@@ -215,9 +251,12 @@ int main()
 			resetBoolList(is_not_set);
 			repeats[0] = 6;
 			repeats[1] = 3;
-			repeats[2] = 6;
+			repeats[2] = 1;
+			repeats[3] = 5;
+			repeats[4] = 1;
 		}
 		
+		drawBlocks(window, blocks);
 		window.display();
 	}
 	return 0;
