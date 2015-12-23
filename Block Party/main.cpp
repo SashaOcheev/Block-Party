@@ -268,7 +268,7 @@ int main()
 		one_step_time = clock.getElapsedTime().asSeconds() - time;
 		time = clock.getElapsedTime().asSeconds();
 		
-		if (time <= FIRST_MAX_TIME)
+		if (time <= PARAMS.FIRST_MAX_TIME)
 			setAnimation(is_not_set[0], blocks, start);
 		else if (repeats[0] > 0)
 		{
