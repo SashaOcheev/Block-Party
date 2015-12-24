@@ -6,6 +6,11 @@
 #include <vector>
 #include <cmath>   
 
+const int ANIMATION_COUNT = 6;
+const int BLOCK_COUNT = 6;
+const int COLOR_COUNT = 7;
+const int CHANGE_COLOR_COUNT = 12;
+
 const struct
 {
 	sf::Vector2f SIZE = { 800, 600 };
@@ -28,12 +33,8 @@ const struct
 	float FOUR_MAX_TIME = 1.f;
 	float DIVIDER = 1000.f;
 	float FIRST_MAX_TIME = 2.f;
+	float ANGLE_CHANGE_COLOR = 30.f;
 } PARAMS;
-
-
-const int ANIMATION_COUNT = 5;
-const int BLOCK_COUNT = 6;
-const int COLOR_COUNT = 7;
 
 
 //        left block        ////////////////////////////////////////
@@ -64,11 +65,11 @@ struct Block
 	float angle_speed;
 
 	Block() {}
-	
+
 	void setStart(sf::Vector2f position)
 	{
 		params.color = sf::Color::Blue;
-		params.size = {BLOCK.SIZE, BLOCK.SIZE};
+		params.size = { BLOCK.SIZE, BLOCK.SIZE };
 		params.position = position;
 		params.origin = { 0.f, 0.f };
 		params.rotation = 0.f;
@@ -102,13 +103,20 @@ void drawBlocks(sf::RenderWindow &window, std::vector<Block> &blocks)
 }
 
 void setAnimation(bool &is_not_set, std::vector<Block> &blocks,
-				 void (*func)(std::vector<Block> &blocks))
+	void(*func)(std::vector<Block> &blocks))
 {
 	if (is_not_set)
 	{
 		(*func)(blocks);
 		is_not_set = false;
 	}
+}
+void setStep(bool &is_not_set, std::vector<Block> &blocks,
+	void(*set)(std::vector<Block> &blocks), int &repeats,
+	void(*update)(std::vector<Block> &blocks, int &repeats))
+{
+	setAnimation(is_not_set, blocks, set);
+	update(blocks, repeats);
 }
 
 void start(std::vector<Block> &blocks)
@@ -121,9 +129,12 @@ void start(std::vector<Block> &blocks)
 		temp_start.x = start.x + i * (BLOCK.SIZE + BLOCK.DISTANCE);
 		blocks[i].setStart(temp_start);
 		blocks[i].start = temp_start;
+		blocks[i].params.rotation = 0.f;
+		blocks[i].block.setRotation(0.f);
 	}
 }
 
+void setNull(std::vector<Block> &blocks) {}
 void setFirst(std::vector<Block> &blocks)
 {
 	for (int i = 0; i < blocks.size(); i++)
@@ -197,22 +208,24 @@ void updateThird(std::vector<Block> &blocks, int &repeats)
 		repeats--;
 }
 
-void updateFourth1(std::vector<Block> &blocks, int &repeats)
-{
+void updateFourth(std::vector<Block> &blocks, int &repeats)
+{	
 	sf::Color colors[COLOR_COUNT]{ sf::Color::Black, sf::Color::Blue, sf::Color::Cyan,
-	sf::Color::Green, sf::Color::Magenta, sf::Color::Red, sf::Color::Yellow };
+		sf::Color::Green, sf::Color::Magenta, sf::Color::Red, sf::Color::Yellow };
 	for (int i = 0; i < blocks.size(); i++)
-		blocks[i].block.setFillColor(colors[rand() % COLOR_COUNT]);
-	repeats--;
-}
-void updateFourth2(std::vector<Block> &blocks, int &repeats)
-{
-	for (int i = 0; i < blocks.size(); i++)
-		if (blocks[i].params.rotation <= 360.f)
+		if (blocks[i].params.rotation < 360.f)
 		{
+			if (blocks[i].params.rotation >= PARAMS.ANGLE_CHANGE_COLOR * abs(repeats - CHANGE_COLOR_COUNT))
+			{
+				blocks[i].block.setFillColor(colors[rand() % COLOR_COUNT]);
+				if (i == blocks.size() - 1)
+					repeats++;
+			}
 			blocks[i].angle_speed = PARAMS.ANGLE_SPEED;
 			blocks[i].updateRotation();
 		}
+		else
+			repeats -= 2;
 }
 
 bool isAround(sf::Vector2f one, sf::Vector2f two)
@@ -225,7 +238,7 @@ void setFifth(std::vector<Block> &blocks)
 {
 	for (int i = 0; i < blocks.size(); i++)
 		blocks[i].speed = { (-blocks[i].params.position.x + blocks[i].start.x) / PARAMS.DIVIDER,
-			( -blocks[i].params.position.y + blocks[i].start.y) / PARAMS.DIVIDER };
+		(-blocks[i].params.position.y + blocks[i].start.y) / PARAMS.DIVIDER };
 }
 void updateFifth(std::vector<Block> &blocks, int &repeats)
 {
@@ -238,7 +251,7 @@ void updateFifth(std::vector<Block> &blocks, int &repeats)
 
 
 int main()
-{	
+{
 	std::vector<Block> blocks;
 	for (int i = 0; i < BLOCK_COUNT; i++)
 	{
@@ -247,12 +260,10 @@ int main()
 	}
 	bool is_not_set[ANIMATION_COUNT];
 	resetBoolList(is_not_set);
-	int repeats[ANIMATION_COUNT] = { 4, 3, 1, 5, 1 };
+	int repeats[ANIMATION_COUNT] = { 0, 4, 3, 1, 12, 1 };
 
 	sf::Clock clock;
 	float time = 0.f;
-	float one_step_time = 0.f;
-	float timer = 0.f;
 
 	sf::ContextSettings settings;
 	settings.antialiasingLevel = WINDOW.ANTIALIASING_LEVEL;
@@ -265,49 +276,31 @@ int main()
 			if (event.type == sf::Event::Closed)
 				window.close();
 
-		one_step_time = clock.getElapsedTime().asSeconds() - time;
 		time = clock.getElapsedTime().asSeconds();
-		
+
 		if (time <= PARAMS.FIRST_MAX_TIME)
 			setAnimation(is_not_set[0], blocks, start);
-		else if (repeats[0] > 0)
-		{
-			setAnimation(is_not_set[1], blocks, setFirst);
-			updateFirst(blocks, repeats[0]);
-		}
 		else if (repeats[1] > 0)
-			updateSecond(blocks, repeats[1]);
+			setStep(is_not_set[1], blocks, setFirst, repeats[1], updateFirst);
 		else if (repeats[2] > 0)
-		{
-			setAnimation(is_not_set[2], blocks, setThird);
-			updateThird(blocks, repeats[2]);
-		}
+			setStep(is_not_set[2], blocks, setNull, repeats[2], updateSecond);
 		else if (repeats[3] > 0)
-		{
-			timer += one_step_time;
-			if (timer >= PARAMS.FOUR_MAX_TIME)
-			{
-				updateFourth1(blocks, repeats[3]);
-				timer = 0;
-			}
-			updateFourth2(blocks, repeats[3]);
-		}
+			setStep(is_not_set[3], blocks, setThird, repeats[3], updateThird);
 		else if (repeats[4] > 0)
-		{
-			setAnimation(is_not_set[4], blocks, setFifth);
-			updateFifth(blocks, repeats[4]);
-		}
+			setStep(is_not_set[4], blocks, setNull, repeats[4], updateFourth);
+		else if (repeats[5] > 0)
+			setStep(is_not_set[5], blocks, setFifth, repeats[5], updateFifth);
 		else
 		{
 			clock.restart();
 			resetBoolList(is_not_set);
-			repeats[0] = 4;
-			repeats[1] = 3;
-			repeats[2] = 1;
-			repeats[3] = 5;
-			repeats[4] = 1;
+			repeats[1] = 4;
+			repeats[2] = 3;
+			repeats[3] = 1;
+			repeats[4] = 12;
+			repeats[5] = 1;
 		}
-		
+
 		window.clear(sf::Color::White);
 		drawBlocks(window, blocks);
 		window.display();
