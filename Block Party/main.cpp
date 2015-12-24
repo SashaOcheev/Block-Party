@@ -36,6 +36,7 @@ const struct
 	float ANGLE_CHANGE_COLOR = 30.f;
 } PARAMS;
 
+const int REPEATS[ANIMATION_COUNT] = { 0, 4, 3, 1, 12, 1 };
 
 //        left block        ////////////////////////////////////////
 struct Rectangle_params
@@ -95,11 +96,10 @@ void resetBoolList(bool is_not_set[ANIMATION_COUNT])
 	for (int i = 0; i < ANIMATION_COUNT; i++)
 		is_not_set[i] = true;
 }
-
-void drawBlocks(sf::RenderWindow &window, std::vector<Block> &blocks)
+void equalizeMassives(const int masFrom[ANIMATION_COUNT], int masTo[ANIMATION_COUNT])
 {
-	for (int i = 0; i < blocks.size(); i++)
-		window.draw(blocks[i].block);
+	for (int i = 0; i < ANIMATION_COUNT; i++)
+		masTo[i] = masFrom[i];
 }
 
 void setAnimation(bool &is_not_set, std::vector<Block> &blocks,
@@ -249,33 +249,32 @@ void updateFifth(std::vector<Block> &blocks, int &repeats)
 			repeats--;
 }
 
-
-int main()
+struct Init
 {
 	std::vector<Block> blocks;
-	for (int i = 0; i < BLOCK_COUNT; i++)
-	{
-		Block block;
-		blocks.push_back(block);
-	}
 	bool is_not_set[ANIMATION_COUNT];
-	resetBoolList(is_not_set);
-	int repeats[ANIMATION_COUNT] = { 0, 4, 3, 1, 12, 1 };
-
+	int repeats[ANIMATION_COUNT];
 	sf::Clock clock;
 	float time = 0.f;
 
-	sf::ContextSettings settings;
-	settings.antialiasingLevel = WINDOW.ANTIALIASING_LEVEL;
-	sf::RenderWindow window(sf::VideoMode(int(WINDOW.SIZE.x), int(WINDOW.SIZE.y)), WINDOW.TITLE, sf::Style::Default, settings);
-
-	while (window.isOpen())
+	Init()
 	{
-		sf::Event event;
-		while (window.pollEvent(event))
-			if (event.type == sf::Event::Closed)
-				window.close();
+		for (int i = 0; i < BLOCK_COUNT; i++)
+		{
+			Block block;
+			blocks.push_back(block);
+		}
+	}
 
+	void reset()
+	{
+		clock.restart();
+		resetBoolList(is_not_set);
+		equalizeMassives(REPEATS, repeats);
+	}
+
+	void update()
+	{
 		time = clock.getElapsedTime().asSeconds();
 
 		if (time <= PARAMS.FIRST_MAX_TIME)
@@ -291,18 +290,37 @@ int main()
 		else if (repeats[5] > 0)
 			setStep(is_not_set[5], blocks, setFifth, repeats[5], updateFifth);
 		else
-		{
-			clock.restart();
-			resetBoolList(is_not_set);
-			repeats[1] = 4;
-			repeats[2] = 3;
-			repeats[3] = 1;
-			repeats[4] = 12;
-			repeats[5] = 1;
-		}
+			reset();
+	}
+
+	void drawBlocks(sf::RenderWindow &window)
+	{
+		for (int i = 0; i < blocks.size(); i++)
+			window.draw(blocks[i].block);
+	}
+
+};
+
+int main()
+{
+	Init init;
+	init.reset();
+
+	sf::ContextSettings settings;
+	settings.antialiasingLevel = WINDOW.ANTIALIASING_LEVEL;
+	sf::RenderWindow window(sf::VideoMode(int(WINDOW.SIZE.x), int(WINDOW.SIZE.y)), WINDOW.TITLE, sf::Style::Default, settings);
+
+	while (window.isOpen())
+	{
+		sf::Event event;
+		while (window.pollEvent(event))
+			if (event.type == sf::Event::Closed)
+				window.close();
+
+		init.update();
 
 		window.clear(sf::Color::White);
-		drawBlocks(window, blocks);
+		init.drawBlocks(window);
 		window.display();
 	}
 	return 0;
